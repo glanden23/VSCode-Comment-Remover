@@ -1,6 +1,7 @@
 {
   "name": "universal-comment-remover",
   "displayName": "Universal Comment Remover",
+  "publisher": "glanden23",
   "description": "Removes all comments from the current file.",
   "version": "0.0.1",
   "engines": {
