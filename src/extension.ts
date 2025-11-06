@@ -17,30 +17,52 @@ export function activate(context: vscode.ExtensionContext) {
 
       const tokens = await textmateTokenService.fetch(document);
 
-      const linesToDelete = new Set<number>();
+      const commentTokensByLine = new Map<number, any[]>();
 
       for (const token of tokens) {
         if (token.scopes.some((scope: string) => scope.startsWith('comment.'))) {
-          linesToDelete.add(token.line);
+          if (!commentTokensByLine.has(token.line)) {
+            commentTokensByLine.set(token.line, []);
+          }
+          commentTokensByLine.get(token.line)!.push(token);
         }
       }
 
-      if (linesToDelete.size === 0) {
-        vscode.window.showInformationMessage('No comments found.');
+      const linesToDelete: number[] = [];
+
+      for (const [lineNumber, commentTokens] of commentTokensByLine.entries()) {
+        const line = document.lineAt(lineNumber);
+        const lineText = line.text;
+        
+        let totalCommentLength = 0;
+        for (const token of commentTokens) {
+          totalCommentLength += (token.endIndex - token.startIndex);
+        }
+        
+        const nonWhitespaceLength = lineText.replace(/\s/g, '').length;
+        const commentNonWhitespaceLength = commentTokens.reduce((sum, token) => {
+          const commentText = lineText.substring(token.startIndex, token.endIndex);
+          return sum + commentText.replace(/\s/g, '').length;
+        }, 0);
+        
+        if (commentNonWhitespaceLength >= nonWhitespaceLength) {
+          linesToDelete.push(lineNumber);
+        }
+      }
+
+      if (linesToDelete.length === 0) {
         return;
       }
 
-      const sortedLines = Array.from(linesToDelete).sort((a, b) => b - a);
+      linesToDelete.sort((a, b) => b - a);
 
       editor.edit(editBuilder => {
-        for (const lineNumber of sortedLines) {
+        for (const lineNumber of linesToDelete) {
           const line = document.lineAt(lineNumber);
           editBuilder.delete(line.rangeIncludingLineBreak);
         }
       }).then(success => {
-        if (success) {
-          vscode.window.showInformationMessage(`Successfully removed ${linesToDelete.size} lines containing comments.`);
-        } else {
+        if (!success) {
           vscode.window.showErrorMessage('Failed to remove comments.');
         }
       });
