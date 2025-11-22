@@ -85,7 +85,7 @@ export function activate(context: vscode.ExtensionContext) {
         commentTokensByLine.get(token.line)!.push(token);
       }
 
-      const linesToDelete = new Set<number>();
+      const rangesToDelete: vscode.Range[] = [];
 
       for (const [lineNumber, commentTokens] of commentTokensByLine.entries()) {
         const line = document.lineAt(lineNumber);
@@ -98,20 +98,30 @@ export function activate(context: vscode.ExtensionContext) {
         }, 0);
         
         if (commentNonWhitespaceLength >= nonWhitespaceLength) {
-          linesToDelete.add(lineNumber);
+          rangesToDelete.push(line.rangeIncludingLineBreak);
+        } else {
+          for (const token of commentTokens) {
+            let startIndex = token.startIndex;
+            const textBefore = lineText.substring(0, token.startIndex);
+            if (textBefore.trim().length > 0) {
+              while (startIndex > 0 && /\s/.test(lineText[startIndex - 1])) {
+                startIndex--;
+              }
+            }
+            
+            rangesToDelete.push(new vscode.Range(lineNumber, startIndex, lineNumber, token.endIndex));
+          }
         }
       }
 
-      if (linesToDelete.size === 0) {
+      if (rangesToDelete.length === 0) {
         return;
       }
 
-      const sortedLines = Array.from(linesToDelete).sort((a, b) => b - a);
-
       editor.edit(editBuilder => {
-        for (const lineNumber of sortedLines) {
-          const line = document.lineAt(lineNumber);
-          editBuilder.delete(line.rangeIncludingLineBreak);
+        const sortedRanges = rangesToDelete.sort((a, b) => b.start.compareTo(a.start));
+        for (const range of sortedRanges) {
+          editBuilder.delete(range);
         }
       }).then(success => {
         if (!success) {

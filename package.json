@@ -3,7 +3,7 @@
   "displayName": "Universal Comment Remover",
   "publisher": "glanden23",
   "description": "Removes all comments from the current file.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "engines": {
     "vscode": "^1.105.0"
   },
